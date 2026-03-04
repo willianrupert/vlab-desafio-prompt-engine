@@ -1,13 +1,111 @@
 import streamlit as st
 import os
 import json
+import re
+from fpdf import FPDF
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from engine import PromptBuilder, json_parser
 
 # --- Configuração da Página ---
-st.set_page_config(page_title="V-LAB | Motor de Prompts", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="motor Hub V-Lab", page_icon="favicon.svg", layout="wide")
+
+# --- CONFIGURAÇÃO DO PDF ---
+class PDFVLab(FPDF):
+    def header(self):
+        # Fundo Roxo no Cabeçalho (Padrão V-LAB: RGB 139, 92, 246)
+        self.set_fill_color(139, 92, 246)
+        self.rect(0, 0, 210, 20, 'F')
+        
+        # Texto do Cabeçalho
+        self.set_font('helvetica', 'B', 16)
+        self.set_text_color(255, 255, 255)
+        self.set_y(6)
+        self.cell(0, 8, 'VLab Hub Educacional', align='C')
+        self.ln(15)
+
+    def footer(self):
+        # Rodapé a 15mm do fundo
+        self.set_y(-15)
+        self.set_font('helvetica', 'I', 8)
+        self.set_text_color(128, 128, 128)
+        self.cell(0, 10, f'Página {self.page_no()}/{{nb}}', align='C')
+
+def gerar_pdf(dados_aula, topico, perfil):
+    pdf = PDFVLab()
+    pdf.add_page()
+    
+    # Nova função aprimorada para limpar marcações pesadas de Markdown
+    def processar_texto(texto):
+        if not isinstance(texto, str):
+            texto = str(texto)
+        # 1. Remove os '#' de cabeçalhos do markdown (ex: ### Título vira só Título)
+        texto = re.sub(r'^#+\s+', '', texto, flags=re.MULTILINE)
+        # 2. Transforma caracteres problemáticos mantendo o básico (latin-1)
+        return texto.encode('latin-1', 'replace').decode('latin-1')
+
+    # Título do Material
+    pdf.set_font("helvetica", "B", 16)
+    pdf.set_text_color(15, 23, 42) # Azul escuro
+    pdf.cell(0, 10, processar_texto(f"Plano de Aula: {topico}"), ln=True)
+    
+    # Subtítulo (Perfil)
+    pdf.set_font("helvetica", "I", 10)
+    pdf.set_text_color(100, 116, 139) # Cinzento
+    texto_perfil = f"Aluno(a): {perfil['nome']} | Idade: {perfil['idade']} anos | Nível: {perfil['nivel']} | Estilo: {perfil['estilo_aprendizado']}"
+    pdf.cell(0, 6, processar_texto(texto_perfil), ln=True)
+    pdf.ln(8)
+
+    # Raciocínio da IA
+    if "raciocinio" in dados_aula:
+        pdf.set_font("helvetica", "B", 12)
+        pdf.set_text_color(139, 92, 246) # Roxo
+        pdf.cell(0, 8, processar_texto("Raciocínio Pedagógico:"), ln=True)
+        pdf.set_font("helvetica", "", 10)
+        pdf.set_text_color(71, 85, 105)
+        
+        texto_raciocinio = processar_texto(dados_aula["raciocinio"])
+        try:
+            # Ativando o markdown aqui também!
+            pdf.multi_cell(0, 6, txt=texto_raciocinio, markdown=True)
+        except Exception:
+            # Fallback de segurança se o markdown vier quebrado
+            texto_raciocinio_limpo = texto_raciocinio.replace('**', '').replace('*', '')
+            pdf.multi_cell(0, 6, txt=texto_raciocinio_limpo)
+            
+        pdf.ln(5)
+
+    # Conteúdo Principal
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(15, 23, 42)
+    pdf.cell(0, 10, processar_texto("Conteúdo da Aula:"), ln=True)
+    
+    # Reseta a fonte para o texto base
+    pdf.set_font("helvetica", "", 11)
+    pdf.set_text_color(0, 0, 0)
+    
+    # Extrai o conteúdo independentemente do formato
+    conteudo_texto = dados_aula.get("conteudo") or dados_aula.get("exemplos") or dados_aula.get("perguntas") or dados_aula.get("representacao_visual") or json.dumps(dados_aula, indent=2, ensure_ascii=False)
+    
+    # Formata listas e dicionários
+    if isinstance(conteudo_texto, list):
+        conteudo_texto = "\n".join([f"- {item}" for item in conteudo_texto])
+    elif isinstance(conteudo_texto, dict):
+        conteudo_texto = json.dumps(conteudo_texto, indent=2, ensure_ascii=False)
+
+    texto_final = processar_texto(conteudo_texto)
+    
+    # Tenta usar o markdown=True para converter ** em negrito e * em itálico
+    try:
+        # A mágica acontece neste parâmetro: markdown=True
+        pdf.multi_cell(0, 6, txt=texto_final, markdown=True)
+    except Exception:
+        # Fallback de segurança: se o markdown da IA vier quebrado, tira os asteriscos e imprime liso
+        texto_limpo = texto_final.replace('**', '').replace('*', '')
+        pdf.multi_cell(0, 6, txt=texto_limpo)
+    
+    return bytes(pdf.output())
 
 # --- Autenticação da API ---
 @st.cache_resource
@@ -122,14 +220,30 @@ with aba_gerador:
                 conteudo_final = {k: v for k, v in resultado.items() if k != "raciocinio"}
                 st.write(conteudo_final.get("conteudo") or conteudo_final.get("exemplos") or conteudo_final.get("perguntas") or conteudo_final.get("representacao_visual") or conteudo_final)
                 
-                # Feature: Download JSON
-                json_string = json.dumps(resultado, indent=4, ensure_ascii=False)
-                st.download_button(
-                    label="📥 Baixar Resultado (JSON)",
-                    file_name=f"aula_{topico_input.replace(' ', '_').lower()}.json",
-                    mime="application/json",
-                    data=json_string
-                )
+                # --- Botões de Download (JSON e PDF) ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_down1, col_down2 = st.columns(2)
+                
+                with col_down1:
+                    json_string = json.dumps(resultado, indent=4, ensure_ascii=False)
+                    st.download_button(
+                        label="📥 Baixar Resultado (JSON)",
+                        file_name=f"aula_{topico_input.replace(' ', '_').lower()}.json",
+                        mime="application/json",
+                        data=json_string,
+                        use_container_width=True
+                    )
+                
+                with col_down2:
+                    pdf_bytes = gerar_pdf(resultado, topico_input, aluno_atual)
+                    st.download_button(
+                        label="📄 Baixar Resultado (PDF)",
+                        file_name=f"aula_{topico_input.replace(' ', '_').lower()}.pdf",
+                        mime="application/pdf",
+                        data=pdf_bytes,
+                        use_container_width=True,
+                        type="primary"
+                    )
 
 # ================= ABA 2: TESTE A/B =================
 with aba_comparacao:
