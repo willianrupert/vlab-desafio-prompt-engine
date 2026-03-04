@@ -36,7 +36,7 @@ def gerar_pdf(dados_aula, topico, perfil):
     pdf = PDFVLab()
     pdf.add_page()
     
-    # Nova função aprimorada para limpar marcações pesadas de Markdown
+    # Função para limpar marcações pesadas de Markdown
     def processar_texto(texto):
         if not isinstance(texto, str):
             texto = str(texto)
@@ -67,7 +67,7 @@ def gerar_pdf(dados_aula, topico, perfil):
         
         texto_raciocinio = processar_texto(dados_aula["raciocinio"])
         try:
-            # Ativando o markdown aqui também!
+            # Ativando o markdown aqui também
             pdf.multi_cell(0, 6, txt=texto_raciocinio, markdown=True)
         except Exception:
             # Fallback de segurança se o markdown vier quebrado
@@ -98,7 +98,7 @@ def gerar_pdf(dados_aula, topico, perfil):
     
     # Tenta usar o markdown=True para converter ** em negrito e * em itálico
     try:
-        # A mágica acontece neste parâmetro: markdown=True
+        # Ativando o markdown: markdown=True
         pdf.multi_cell(0, 6, txt=texto_final, markdown=True)
     except Exception:
         # Fallback de segurança: se o markdown da IA vier quebrado, tira os asteriscos e imprime liso
@@ -124,7 +124,7 @@ client = get_genai_client()
 def gerar_conteudo_ia(_aluno, topico, tipo_conteudo, prompt_generico=False):
     builder = PromptBuilder(_aluno)
     
-    # Se for o teste A/B, usa um prompt burro/simples
+    # Se for o teste A/B, usa um prompt simples
     if prompt_generico:
         prompt = f"Me explique sobre {topico}. Retorne em JSON no formato {{\"conteudo\": \"sua explicacao\"}}"
     else:

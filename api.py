@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-# Importando o motor que você já construiu
+# Importando o motor de engine.py
 from engine import PromptBuilder, json_parser 
 
 load_dotenv()
@@ -19,7 +19,7 @@ client = genai.Client(api_key=API_KEY)
 
 app = FastAPI(title="V-LAB Motor de Prompts API")
 
-# Configuração de CORS: Essencial para permitir que a Vercel acesse este servidor
+# Configuração de CORS: Essencial para o Vercel acessar esse servidor
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://edu.rlight.com.br", "http://localhost:5173"], # Permite prod e dev
@@ -42,7 +42,7 @@ class GerarAulaRequest(BaseModel):
 
 @app.post("/gerar_aula")
 async def gerar_aula(req: GerarAulaRequest):
-    # Transforma o Pydantic model em dict para o seu PromptBuilder
+    # Transforma o Pydantic model em dict para o PromptBuilder
     builder = PromptBuilder(req.aluno.dict())
     
     # Roteamento do tipo de prompt baseado na requisição

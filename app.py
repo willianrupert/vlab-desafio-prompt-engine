@@ -2,7 +2,7 @@ import os
 import json
 from datetime import datetime
 from google import genai
-from google.genai import types # IMPORTANTE: Adicionado para configuração da API
+from google.genai import types # Adicionado para configuração da API
 from dotenv import load_dotenv
 from engine import PromptBuilder, json_parser
 
@@ -16,10 +16,10 @@ if not API_KEY:
 # Inicializa o cliente com o novo SDK
 client = genai.Client(api_key=API_KEY)
 
-# 2. Nosso aluno de teste
+# 2. O aluno de teste
 aluno_teste = {
     "nome": "Willian",
-    "idade": 22,
+    "idade": 23,
     "nivel": "avançado",
     "estilo_aprendizado": "cinestésico"
 }
@@ -33,7 +33,7 @@ def gerar_aula():
     
     print("🤖 Enviando para o Gemini (Isso pode levar alguns segundos)...")
     try:
-        # A MÁGICA AQUI: Forçando o MIME Type para application/json
+        # Forçando o MIME Type para application/json
         resposta = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt_final,
@@ -43,7 +43,7 @@ def gerar_aula():
         )
         
         texto_bruto = resposta.text
-        # Descomente a linha abaixo se quiser ver exatamente o que a IA está cuspindo antes de limpar
+        # Descomentar a linha abaixo se quiser ver exatamente o que a IA está enviando antes de limpar
         # print(f"\n[DEBUG] Texto bruto recebido:\n{texto_bruto[:200]}...\n")
         
         print("🧹 Limpando e validando o JSON retornado...")
@@ -63,7 +63,7 @@ def gerar_aula():
         
     except Exception as e:
         print(f"❌ Erro ao gerar aula: {e}")
-        # Se falhar novamente, o bloco abaixo vai imprimir a "cena do crime" para a gente arrumar
+        # Se falhar novamente, o bloco abaixo vai imprimir o erro
         try:
             print(f"\n🔍 A resposta problemática enviada pelo Gemini foi:\n{resposta.text}")
         except:
